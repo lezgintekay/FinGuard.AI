@@ -2,9 +2,12 @@ using FinGuard.API.Data;
 using FinGuard.API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace FinGuard.API.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class FaturaController : ControllerBase
@@ -20,7 +23,10 @@ namespace FinGuard.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetFaturalar()
         {
-            var faturalar = await _context.Faturalar.ToListAsync();
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdString, out int userId)) return Unauthorized();
+
+            var faturalar = await _context.Faturalar.Where(f => f.UserId == userId).ToListAsync();
             return Ok(faturalar);
         }
 
@@ -28,17 +34,49 @@ namespace FinGuard.API.Controllers
         [HttpPost]
         public async Task<IActionResult> YeniFaturaEkle([FromBody] Fatura yeniFatura)
         {
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdString, out int userId)) return Unauthorized();
+
             if (yeniFatura == null)
             {
                 return BadRequest("Fatura verisi boş olamaz.");
             }
 
-            // Gelen faturayı veritabanına ekliyoruz
+            yeniFatura.UserId = userId; // Ensure it's linked to the correct user
             _context.Faturalar.Add(yeniFatura);
             await _context.SaveChangesAsync();
 
-            // Kayıt başarılı olduktan sonra 201 Created dönüyoruz
-            return CreatedAtAction(nameof(GetFaturalar), new { id = yeniFatura.Id }, yeniFatura);
+            return Ok(yeniFatura);
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> FaturaSil(int id)
+        {
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdString, out int userId)) return Unauthorized();
+
+            var fatura = await _context.Faturalar.FirstOrDefaultAsync(f => f.Id == id && f.UserId == userId);
+            if (fatura == null) return NotFound("Fatura bulunamadı.");
+
+            _context.Faturalar.Remove(fatura);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        [HttpPut("{id}/durum")]
+        public async Task<IActionResult> DurumGuncelle(int id, [FromBody] string yeniDurum)
+        {
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdString, out int userId)) return Unauthorized();
+
+            var fatura = await _context.Faturalar.FirstOrDefaultAsync(f => f.Id == id && f.UserId == userId);
+            if (fatura == null) return NotFound("Fatura bulunamadı.");
+
+            fatura.Durum = yeniDurum;
+            await _context.SaveChangesAsync();
+
+            return Ok(fatura);
         }
     }
 }

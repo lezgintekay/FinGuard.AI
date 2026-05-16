@@ -21,22 +21,40 @@ namespace FinGuard.API.Services
             }
         }
 
-        public async Task<string> AnalyzeRiskAsync(Hesap hesap, List<Fatura> faturalar)
+        public async Task<string> AnalyzeRiskAsync(Hesap hesap, List<Fatura> faturalar, List<SatisVerisi> satislar)
         {
             // 1. PROMPT MÜHENDİSLİĞİ: Ajanın Rolünü ve Hedefini Belirliyoruz
             var promptBuilder = new StringBuilder();
             promptBuilder.AppendLine("Sen KOBİ'ler için çalışan uzman bir Finansal Kontrolörsün (CFO-Bot).");
             promptBuilder.AppendLine($"Şu an şirketin kasasında {hesap.ToplamBakiye} {hesap.ParaBirimi} bulunuyor.");
-            promptBuilder.AppendLine("Aşağıdaki faturaları incele ve önümüzdeki 30 gün içinde bir nakit darboğazı olup olmayacağını analiz et.");
+            var gidenler = faturalar.Where(f => f.FaturaTipi == "Giden").Sum(f => f.Tutar);
+            var gelenler = faturalar.Where(f => f.FaturaTipi == "Gelen").Sum(f => f.Tutar);
+            var netLikidite = hesap.ToplamBakiye + gelenler - gidenler;
+
+            promptBuilder.AppendLine("Aşağıdaki geçmiş satış verilerini, gelecek borç/alacak faturalarını incele ve şirketin finansal sağlığını analiz et.");
+            promptBuilder.AppendLine($"Eğer Net Likidite ({netLikidite} TL) eksiye düşüyorsa veya satışlarda dönemsel bir daralma varsa acil uyarı ver ve stratejik CFO tavsiyelerinde bulun (Kampanya, finansman vs).");
             
-            // Hackathon için kilit nokta: API'den sadece JSON istiyoruz!
-            promptBuilder.AppendLine("Lütfen SADECE aşağıdaki JSON formatında yanıt ver, ekstra hiçbir karşılama veya açıklama metni ekleme:");
-            promptBuilder.AppendLine("{ \"RiskDurumu\": \"Kritik/Orta/Dusuk\", \"AcikTutar\": 0, \"Mesaj\": \"...\", \"OnerilenAksiyon\": \"...\", \"HedefFaturaID\": 0 }");
-            promptBuilder.AppendLine("\nSistemdeki Faturalar:");
+            promptBuilder.AppendLine("Lütfen SADECE aşağıdaki JSON formatında yanıt ver, ekstra hiçbir açıklama ekleme:");
+            promptBuilder.AppendLine("{ \"RiskDurumu\": \"Kritik/Orta/Dusuk/Guvende\", \"AcikTutar\": 0, \"Mesaj\": \"...\", \"OnerilenAksiyon\": \"...\" }");
             
-            foreach (var f in faturalar)
+            promptBuilder.AppendLine("\n--- SON 5 YILLIK SATIŞ VERİLERİ ---");
+            if (satislar != null && satislar.Any())
             {
-                promptBuilder.AppendLine($"- ID: {f.Id}, Fatura No: {f.FaturaNo}, Tutar: {f.Tutar}, Vade: {f.VadeTarihi:yyyy-MM-dd}, Tip: {f.FaturaTipi}, Durum: {f.Durum}");
+                foreach (var s in satislar.OrderBy(x => x.Yil).ThenBy(x => x.Ay))
+                {
+                    promptBuilder.AppendLine($"{s.Yil} Yılı {s.Ay}. Ay: {s.ToplamSatis} TL");
+                }
+            }
+            else
+            {
+                promptBuilder.AppendLine("Geçmiş satış verisi bulunmamaktadır.");
+            }
+
+            promptBuilder.AppendLine("\n--- BEKLEYEN FATURALAR (BORÇ VE ALACAKLAR) ---");
+            foreach (var f in faturalar.Where(f => f.Durum != "Ödendi"))
+            {
+                var tipLabel = f.FaturaTipi == "Giden" ? "Borç (Ödenecek)" : "Alacak (Tahsil Edilecek)";
+                promptBuilder.AppendLine($"- Tutar: {f.Tutar} TL | Vade: {f.VadeTarihi:yyyy-MM-dd} | Tip: {tipLabel} | Cari: {f.CariAd}");
             }
 
             // 2. İstek Gövdesini (Payload) Oluşturma
@@ -52,8 +70,8 @@ namespace FinGuard.API.Services
             
             var cleanApiKey = _apiKey.Trim();
 
-// Listemizdeki en stabil ve yetenekli modellerden biri olan gemini-2.5-flash'ı kullanıyoruz
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={cleanApiKey}";
+// Listemizdeki ücretsiz kullanıma (Free Tier) en uygun ve hızlı model olan gemini-1.5-flash'ı kullanıyoruz
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={cleanApiKey}";
 
 // 2. API'ye İstek Atma
             var response = await _httpClient.PostAsync(url, jsonContent);
@@ -61,9 +79,8 @@ namespace FinGuard.API.Services
 // 3. HATA YAKALAMA (Google'ın asıl mesajını okuyoruz)
             if (!response.IsSuccessStatusCode)
             {
-                // Google'ın bize gönderdiği detaylı hata mesajını alıp ekrana yazdırıyoruz
-                var errorDetail = await response.Content.ReadAsStringAsync();
-                throw new Exception($"Gemini API Hatası: {(int)response.StatusCode} - {errorDetail}");
+                // Kotası dolmuş veya hata almışsa uygulamanın çökmesini önleyip sahte (mock) veri dönüyoruz
+                return "{ \"RiskDurumu\": \"Hata (Kota Doldu)\", \"AcikTutar\": 0, \"Mesaj\": \"Yapay zeka analiz API limitiniz (Gemini API) dolmuş görünüyor. Uygulamayı kullanmaya devam edebilirsiniz ancak yapay zeka analizleri şu an çalışmıyor.\", \"OnerilenAksiyon\": \"API Anahtarınızı yenileyin\", \"HedefFaturaID\": 0 }";
             }
 
 // 4. Gelen Yanıtı İşleme (Eski kodlar aynı kalıyor)

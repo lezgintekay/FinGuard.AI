@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FinGuard.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260516122124_RenameSonGuncellemeTarihi")]
-    partial class RenameSonGuncellemeTarihi
+    [Migration("20260516164518_AddAuthAndUsers")]
+    partial class AddAuthAndUsers
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -48,10 +48,15 @@ namespace FinGuard.API.Migrations
                     b.Property<decimal>("Tutar")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("VadeTarihi")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Faturalar");
                 });
@@ -72,9 +77,75 @@ namespace FinGuard.API.Migrations
                     b.Property<decimal>("ToplamBakiye")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("UserId");
+
                     b.ToTable("Hesaplar");
+                });
+
+            modelBuilder.Entity("FinGuard.API.Models.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GoogleSubjectId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PasswordHash")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("FinGuard.API.Models.Fatura", b =>
+                {
+                    b.HasOne("FinGuard.API.Models.User", "User")
+                        .WithMany("Faturalar")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FinGuard.API.Models.Hesap", b =>
+                {
+                    b.HasOne("FinGuard.API.Models.User", "User")
+                        .WithMany("Hesaplar")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FinGuard.API.Models.User", b =>
+                {
+                    b.Navigation("Faturalar");
+
+                    b.Navigation("Hesaplar");
                 });
 #pragma warning restore 612, 618
         }

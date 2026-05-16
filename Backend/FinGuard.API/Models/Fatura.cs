@@ -11,4 +11,6 @@ public class Fatura
         public string FaturaTipi { get; set; }
         public string Durum { get; set; } = "Bekliyor";
 
+        public int UserId { get; set; }
+        public User? User { get; set; }
 }
