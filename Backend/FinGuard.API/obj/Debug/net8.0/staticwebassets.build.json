@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "NGWEJTRlBF4r3gczj92ZkfQ33XRBCB/5Fnu5TBbeI9U=",
+  "Source": "FinGuard.API",
+  "BasePath": "_content/FinGuard.API",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
