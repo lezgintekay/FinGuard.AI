@@ -41,8 +41,8 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Gemini servisimizi HTTP Client yetenekleriyle birlikte sisteme kaydediyoruz
-builder.Services.AddHttpClient<FinGuard.API.Services.GeminiService>();
+// Gemini servisimizi sisteme kaydediyoruz
+builder.Services.AddHttpClient<FinGuard.API.Services.IAiService, FinGuard.API.Services.GeminiService>();
 
 var app = builder.Build();
 

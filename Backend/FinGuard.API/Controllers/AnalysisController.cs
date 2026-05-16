@@ -13,12 +13,12 @@ namespace FinGuard.API.Controllers
     public class AnalysisController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly GeminiService _geminiService;
+        private readonly IAiService _aiService;
 
-        public AnalysisController(AppDbContext context, GeminiService geminiService)
+        public AnalysisController(AppDbContext context, IAiService aiService)
         {
             _context = context;
-            _geminiService = geminiService;
+            _aiService = aiService;
         }
 
         [HttpGet("risk")]
@@ -44,8 +44,8 @@ namespace FinGuard.API.Controllers
                 hesap.ToplamBakiye = overrideKasa.Value;
             }
 
-            // 2. Verileri yapay zeka ajanımıza (Gemini) gönderiyoruz
-            var aiResponse = await _geminiService.AnalyzeRiskAsync(hesap, faturalar, satislar);
+            // 2. Verileri yapay zeka ajanımıza (IAiService üzerinden Groq veya Gemini) gönderiyoruz
+            var aiResponse = await _aiService.AnalyzeRiskAsync(hesap, faturalar, satislar);
 
             // 3. Gemini'den gelen yanıt zaten JSON formatında olduğu için doğrudan dışarı basıyoruz
             return Content(aiResponse, "application/json");

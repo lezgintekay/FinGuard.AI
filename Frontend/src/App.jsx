@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import axios from 'axios';
 import { Toaster, toast } from 'react-hot-toast';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import './index.css';
 import LoginPage from './LoginPage';
 import RegisterPage from './RegisterPage';
@@ -34,6 +35,14 @@ function App() {
   const [simText, setSimText] = useState("");
   const [kasaNakit, setKasaNakit] = useState(50000);
 
+  // CFO-Bot Sohbet State
+  const [chatMessages, setChatMessages] = useState([
+    { role: 'bot', text: 'Merhaba! Ben FinGuard CFO-Bot. Size faturalarınız, nakit akışınız ve finansal durumunuz hakkında yardımcı olabilirim. Ayrıca fatura vadesi uzatma, durum güncelleme ve kasa bakiyesi değiştirme gibi işlemleri otonom olarak gerçekleştirebilirim. Nasıl yardımcı olabilirim?' }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef(null);
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
@@ -51,6 +60,7 @@ function App() {
   const [formTutar, setFormTutar] = useState("");
   const [formVade, setFormVade] = useState("");
   const [formTip, setFormTip] = useState("Giden");
+  const [formTaksit, setFormTaksit] = useState(1);
 
   // Satış Ekleme Form State'leri
   const [formYil, setFormYil] = useState(new Date().getFullYear());
@@ -90,6 +100,12 @@ function App() {
     setUser(data.user);
     setIsAuthenticated(true);
     setInitialLoading(true);
+    // Oturum güvenliği: Yeni kullanıcı için sohbet geçmişini sıfırla
+    setChatMessages([
+      { role: 'bot', text: `Merhaba ${data.user.name}! Ben FinGuard CFO-Bot. Faturalarınız, nakit akışınız ve finansal durumunuz hakkında yardımcı olabilirim. Ayrıca fatura vadesi uzatma, durum güncelleme ve kasa bakiyesi değiştirme gibi işlemleri otonom olarak gerçekleştirebilirim. Nasıl yardımcı olabilirim?` }
+    ]);
+    setChatInput('');
+    setChatLoading(false);
     await fetchData(kasaNakit);
     toast.success(`Hoş geldin, ${data.user.name}!`);
   };
@@ -102,10 +118,17 @@ function App() {
     setUser(null);
     setRiskData(null);
     setInvoices([]);
+    setSalesData([]);
     setKasaNakit(50000); // reset to default
     setSimText("");
     setActiveTab("genel-bakis");
     setShowRegister(false);
+    // Oturum güvenliği: Önceki kullanıcının sohbet geçmişini temizle
+    setChatMessages([
+      { role: 'bot', text: 'Merhaba! Ben FinGuard CFO-Bot. Size faturalarınız, nakit akışınız ve finansal durumunuz hakkında yardımcı olabilirim. Nasıl yardımcı olabilirim?' }
+    ]);
+    setChatInput('');
+    setChatLoading(false);
   };
 
   const handleSimulation = (e) => {
@@ -127,6 +150,7 @@ function App() {
     }
 
     setAddingInvoice(true);
+    const taksitSayisi = parseInt(formTaksit) || 1;
     const newFatura = {
       faturaNo: formFaturaNo,
       cariAd: formCariAd,
@@ -134,12 +158,15 @@ function App() {
       kesimTarihi: new Date().toISOString(),
       vadeTarihi: new Date(formVade).toISOString(),
       faturaTipi: formTip,
-      durum: "Bekliyor"
+      durum: "Bekliyor",
+      taksitliMi: taksitSayisi > 1,
+      toplamTaksit: taksitSayisi,
+      odenenTaksit: 0
     };
 
     try {
       await axios.post('/Fatura', newFatura);
-      setFormFaturaNo(""); setFormCariAd(""); setFormTutar(""); setFormVade(""); setFormTip("Giden");
+      setFormFaturaNo(""); setFormCariAd(""); setFormTutar(""); setFormVade(""); setFormTip("Giden"); setFormTaksit(1);
       toast.success("Yeni fatura eklendi!");
       await fetchData();
     } catch(err) {
@@ -206,6 +233,29 @@ function App() {
     }
   };
 
+  // CFO-Bot Sohbet fonksiyonu
+  const sendChatMessage = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim() || chatLoading) return;
+
+    const userMessage = chatInput.trim();
+    setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const res = await axios.post('/Chat/message', { message: userMessage });
+      setChatMessages(prev => [...prev, { role: 'bot', text: res.data.response }]);
+      // Fatura veya kasa değişikliği yapılmış olabilir, verileri tazele
+      await fetchData();
+    } catch (err) {
+      setChatMessages(prev => [...prev, { role: 'bot', text: '⚠️ Bir hata oluştu. Lütfen tekrar deneyin.' }]);
+    } finally {
+      setChatLoading(false);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <GoogleOAuthProvider clientId="BURAYA_GOOGLE_CLIENT_ID_YAZILACAK">
@@ -245,6 +295,9 @@ function App() {
           <a onClick={() => setActiveTab('nakit-akisi')} className={`nav-link ${activeTab === 'nakit-akisi' ? 'active' : ''}`}>
             <span className="material-symbols-outlined">payments</span> Nakit Akışı & AI
           </a>
+          <a onClick={() => setActiveTab('cfo-bot')} className={`nav-link ${activeTab === 'cfo-bot' ? 'active' : ''}`}>
+            <span className="material-symbols-outlined">forum</span> CFO-Bot Sohbet
+          </a>
           <a onClick={() => setActiveTab('bot-ayarlari')} className={`nav-link ${activeTab === 'bot-ayarlari' ? 'active' : ''}`}>
             <span className="material-symbols-outlined">smart_toy</span> Bot Ayarları
           </a>
@@ -273,7 +326,7 @@ function App() {
           <div className="page-title">{activeTab.replace('-', ' ')} Paneli</div>
           <div className="ai-status">
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>bolt</span>
-            <span>Gemini 1.5 Flash Aktif</span>
+            <span>Gemini 2.0 Flash Aktif</span>
           </div>
         </header>
 
@@ -353,6 +406,72 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Satış Trendi Grafiği */}
+            {salesData.length > 0 && (
+              <div className="bento-grid" style={{ marginTop: '24px' }}>
+                <div className="glass-card" style={{ gridColumn: 'span 8' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                    <span className="material-symbols-outlined" style={{ color: 'var(--accent-primary)' }}>trending_up</span>
+                    <span className="card-label" style={{ margin: 0 }}>Aylık Satış Trendi</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={salesData
+                      .sort((a, b) => a.yil === b.yil ? a.ay - b.ay : a.yil - b.yil)
+                      .slice(-24)
+                      .map(s => ({ name: `${s.ay}/${s.yil}`, satis: s.toplamSatis }))}
+                    >
+                      <defs>
+                        <linearGradient id="colorSatis" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="name" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} />
+                      <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickFormatter={(v) => `${(v/1000).toFixed(0)}K`} />
+                      <Tooltip
+                        contentStyle={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '13px' }}
+                        formatter={(value) => [`₺${Number(value).toLocaleString('tr-TR')}`, 'Satış']}
+                      />
+                      <Area type="monotone" dataKey="satis" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorSatis)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="glass-card" style={{ gridColumn: 'span 4' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                    <span className="material-symbols-outlined" style={{ color: '#f59e0b' }}>bar_chart</span>
+                    <span className="card-label" style={{ margin: 0 }}>Fatura Dağılımı</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={[
+                      {
+                        name: 'Bekleyen',
+                        giden: invoices.filter(i => i.faturaTipi === 'Giden' && i.durum !== 'Ödendi').reduce((a, c) => a + c.tutar, 0),
+                        gelen: invoices.filter(i => i.faturaTipi === 'Gelen' && i.durum !== 'Ödendi').reduce((a, c) => a + c.tutar, 0),
+                      },
+                      {
+                        name: 'Ödenen',
+                        giden: invoices.filter(i => i.faturaTipi === 'Giden' && i.durum === 'Ödendi').reduce((a, c) => a + c.tutar, 0),
+                        gelen: invoices.filter(i => i.faturaTipi === 'Gelen' && i.durum === 'Ödendi').reduce((a, c) => a + c.tutar, 0),
+                      }
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="name" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} />
+                      <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickFormatter={(v) => `${(v/1000).toFixed(0)}K`} />
+                      <Tooltip
+                        contentStyle={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '13px' }}
+                        formatter={(value) => [`₺${Number(value).toLocaleString('tr-TR')}`]}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '12px', color: '#a1a1aa' }} />
+                      <Bar dataKey="giden" name="Borç (Giden)" fill="#ef4444" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="gelen" name="Alacak (Gelen)" fill="#10b981" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -369,6 +488,18 @@ function App() {
                   <option value="Giden">Giden Fatura (Borç/Ödenecek)</option>
                   <option value="Gelen">Gelen Fatura (Alacak/Tahsil Edilecek)</option>
                 </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>Taksit:</label>
+                  <select className="sim-input" value={formTaksit} onChange={(e) => setFormTaksit(e.target.value)} disabled={addingInvoice} style={{ flex: 1 }}>
+                    <option value={1}>Peşin (Tek Ödeme)</option>
+                    <option value={2}>2 Taksit</option>
+                    <option value={3}>3 Taksit</option>
+                    <option value={4}>4 Taksit</option>
+                    <option value={6}>6 Taksit</option>
+                    <option value={9}>9 Taksit</option>
+                    <option value={12}>12 Taksit</option>
+                  </select>
+                </div>
                 <button className="sim-btn" type="submit" style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }} disabled={addingInvoice}>
                   {addingInvoice ? (
                     <>
@@ -395,6 +526,7 @@ function App() {
                       <th style={{ padding: '12px' }}>Tip</th>
                       <th style={{ padding: '12px' }}>Vade Tarihi</th>
                       <th style={{ padding: '12px' }}>Tutar</th>
+                      <th style={{ padding: '12px' }}>Taksit</th>
                       <th style={{ padding: '12px' }}>Durum</th>
                       <th style={{ padding: '12px' }}>İşlem</th>
                     </tr>
@@ -407,8 +539,23 @@ function App() {
                         <td style={{ padding: '12px' }}><span className="status-badge" style={{ background: inv.faturaTipi === 'Giden' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: inv.faturaTipi === 'Giden' ? 'var(--accent-error)' : 'var(--accent-success)' }}>{inv.faturaTipi}</span></td>
                         <td style={{ padding: '12px' }}>{inv.vadeTarihi ? new Date(inv.vadeTarihi).toLocaleDateString('tr-TR') : '-'}</td>
                         <td style={{ padding: '12px', fontWeight: 800 }}>₺{inv.tutar?.toLocaleString('tr-TR')}</td>
+                        <td style={{ padding: '12px' }}>
+                          {inv.taksitliMi ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span className="status-badge" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', fontSize: '11px' }}>
+                                {inv.odenenTaksit}/{inv.toplamTaksit} Taksit
+                              </span>
+                              <div style={{ width: '100%', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.1)' }}>
+                                <div style={{ width: `${(inv.odenenTaksit / inv.toplamTaksit) * 100}%`, height: '100%', borderRadius: '2px', background: inv.odenenTaksit >= inv.toplamTaksit ? 'var(--accent-success)' : '#818cf8', transition: 'width 0.3s ease' }}></div>
+                              </div>
+                              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>₺{(inv.tutar / inv.toplamTaksit).toLocaleString('tr-TR', {maximumFractionDigits: 0})}/taksit</span>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Peşin</span>
+                          )}
+                        </td>
                         <td style={{ padding: '12px' }}><span className="status-badge" style={{ background: inv.durum === 'Ödendi' ? 'rgba(16, 185, 129, 0.1)' : '', color: inv.durum === 'Ödendi' ? 'var(--accent-success)' : '' }}>{inv.durum || 'Bekliyor'}</span></td>
-                        <td style={{ padding: '12px', display: 'flex', gap: '8px' }}>
+                        <td style={{ padding: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           {inv.durum !== 'Ödendi' && (
                             <button onClick={() => handleUpdateStatus(inv.id, 'Ödendi')} style={{ background: 'transparent', border: '1px solid var(--accent-success)', color: 'var(--accent-success)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '12px' }}>Ödendi Yap</button>
                           )}
@@ -417,7 +564,7 @@ function App() {
                       </tr>
                     ))}
                     {invoices.length === 0 && (
-                      <tr><td colSpan="7" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Henüz fatura bulunmuyor.</td></tr>
+                      <tr><td colSpan="8" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Henüz fatura bulunmuyor.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -440,6 +587,90 @@ function App() {
                  </div>
                </div>
              )}
+          </div>
+        )}
+
+        {activeTab === 'cfo-bot' && (
+          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)', padding: 0, overflow: 'hidden' }}>
+            {/* Chat Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--card-border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)', display: 'grid', placeItems: 'center' }}>
+                <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '22px' }}>smart_toy</span>
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, color: '#fff', fontSize: '15px' }}>FinGuard CFO-Bot</div>
+                <div style={{ fontSize: '11px', color: 'var(--accent-success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-success)', display: 'inline-block' }}></span>
+                  Otonom Ajan Aktif • Gemini 2.0 Flash
+                </div>
+              </div>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+                <span className="status-badge" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', fontSize: '10px', padding: '4px 8px' }}>Function Calling</span>
+                <span className="status-badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-success)', fontSize: '10px', padding: '4px 8px' }}>Agentic</span>
+              </div>
+            </div>
+
+            {/* Chat Messages */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {chatMessages.map((msg, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: '10px', alignItems: 'flex-start' }}>
+                  {msg.role === 'bot' && (
+                    <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '16px' }}>smart_toy</span>
+                    </div>
+                  )}
+                  <div style={{
+                    maxWidth: '70%',
+                    padding: '14px 18px',
+                    borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                    background: msg.role === 'user'
+                      ? 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)'
+                      : 'rgba(255,255,255,0.06)',
+                    border: msg.role === 'user' ? 'none' : '1px solid var(--card-border)',
+                    color: '#e4e4e7',
+                    fontSize: '13.5px',
+                    lineHeight: '1.65',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word'
+                  }}>
+                    {msg.text}
+                  </div>
+                  {msg.role === 'user' && (
+                    <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'var(--accent-primary)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '16px' }}>person</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {chatLoading && (
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '16px' }}>smart_toy</span>
+                  </div>
+                  <div style={{ padding: '14px 18px', borderRadius: '18px 18px 18px 4px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--card-border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="loading-pulse" style={{ width: '12px', height: '12px' }}></div>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>CFO-Bot düşünüyor...</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Chat Input */}
+            <form onSubmit={sendChatMessage} style={{ padding: '16px 24px', borderTop: '1px solid var(--card-border)', display: 'flex', gap: '12px', alignItems: 'center', background: 'rgba(0,0,0,0.2)' }}>
+              <input
+                className="sim-input"
+                style={{ flex: 1, margin: 0 }}
+                placeholder="CFO-Bot'a bir mesaj yazın... (Örn: FTR-001 faturasının vadesini 10 gün uzat)"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                disabled={chatLoading}
+              />
+              <button type="submit" className="sim-btn" disabled={chatLoading || !chatInput.trim()} style={{ padding: '12px 24px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>send</span>
+                Gönder
+              </button>
+            </form>
           </div>
         )}
 

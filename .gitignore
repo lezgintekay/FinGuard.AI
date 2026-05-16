@@ -1,0 +1,34 @@
+# ============================
+# .NET / C# Backend
+# ============================
+bin/
+obj/
+*.db
+*.db-shm
+*.db-wal
+*.user
+*.suo
+*.cache
+.vs/
+.idea/
+
+# ============================
+# Node.js / React Frontend
+# ============================
+node_modules/
+dist/
+.env
+.env.local
+.env.production
+
+# ============================
+# OS Files
+# ============================
+.DS_Store
+Thumbs.db
+
+# ============================
+# Hassas Dosyalar (API Key'ler)
+# ============================
+appsettings.Development.json
+!appsettings.Development.example.json
