@@ -19,4 +19,15 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Veritabanı Seed İşlemi
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<AppDbContext>();
+    // Veritabanı yoksa oluşturur, varsa günceller
+    context.Database.Migrate(); 
+    // Sahte verilerimizi basar
+    DbSeeder.SeedData(context);
+}
+
 app.Run();

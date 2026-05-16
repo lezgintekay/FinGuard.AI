@@ -55,13 +55,7 @@
 /home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/FinGuard.API.sourcelink.json
 /home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/staticwebassets.build.json
 /home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/staticwebassets.development.json
-/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/staticwebassets/msbuild.FinGuard.API.Microsoft.AspNetCore.StaticWebAssets.props
-/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/staticwebassets/msbuild.build.FinGuard.API.props
-/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.FinGuard.API.props
-/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.FinGuard.API.props
-/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/staticwebassets.pack.json
 /home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/scopedcss/bundle/FinGuard.API.styles.css
-/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/FinGuard.API.csproj.CopyComplete
 /home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/FinGuard.API.dll
 /home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/refint/FinGuard.API.dll
 /home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/FinGuard.API.pdb
@@ -133,3 +127,12 @@
 /home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/bin/Debug/net8.0/tr/Microsoft.CodeAnalysis.Workspaces.resources.dll
 /home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/bin/Debug/net8.0/zh-Hans/Microsoft.CodeAnalysis.Workspaces.resources.dll
 /home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/bin/Debug/net8.0/zh-Hant/Microsoft.CodeAnalysis.Workspaces.resources.dll
+/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/bin/Debug/net8.0/FinGuard.API.staticwebassets.endpoints.json
+/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/rpswa.dswa.cache.json
+/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/rjimswa.dswa.cache.json
+/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/rjsmrazor.dswa.cache.json
+/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/rjsmcshtml.dswa.cache.json
+/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/staticwebassets.build.json.cache
+/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/staticwebassets.build.endpoints.json
+/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/swae.build.ex.cache
+/home/boltstrike/Desktop/FinGuard.AI/Backend/FinGuard.API/obj/Debug/net8.0/FinGuard.CAE3B3C6.Up2Date

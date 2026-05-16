@@ -1,11 +1,1 @@
-{
-  "Version": 1,
-  "Hash": "NGWEJTRlBF4r3gczj92ZkfQ33XRBCB/5Fnu5TBbeI9U=",
-  "Source": "FinGuard.API",
-  "BasePath": "_content/FinGuard.API",
-  "Mode": "Default",
-  "ManifestType": "Build",
-  "ReferencedProjectsConfiguration": [],
-  "DiscoveryPatterns": [],
-  "Assets": []
-}
+{"Version":1,"Hash":"u8TSyIV+iTlN0zv2Xl8SSBq9d04eqIOKbM/rmi55p9g=","Source":"FinGuard.API","BasePath":"/","Mode":"Root","ManifestType":"Build","ReferencedProjectsConfiguration":[],"DiscoveryPatterns":[],"Assets":[],"Endpoints":[]}
