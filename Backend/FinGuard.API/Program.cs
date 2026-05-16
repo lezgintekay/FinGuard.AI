@@ -8,6 +8,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddControllers();
+// Gemini servisimizi HTTP Client yetenekleriyle birlikte sisteme kaydediyoruz
+builder.Services.AddHttpClient<FinGuard.API.Services.GeminiService>();
 
 var app = builder.Build();
 
@@ -18,6 +21,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.MapControllers();
 
 // Veritabanı Seed İşlemi
 using (var scope = app.Services.CreateScope())
