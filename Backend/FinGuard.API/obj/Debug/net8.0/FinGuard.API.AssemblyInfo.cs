@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FinGuard.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9c0196a25b5cef30cd7db318f8418a81760d6fbe")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6d3c803384d77197a64349457e5cf99b71761111")]
 [assembly: System.Reflection.AssemblyProductAttribute("FinGuard.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FinGuard.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
