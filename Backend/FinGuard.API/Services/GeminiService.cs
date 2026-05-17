@@ -139,7 +139,8 @@ namespace FinGuard.API.Services
             var systemPrompt = new StringBuilder();
             systemPrompt.AppendLine("Sen FinGuard AI platformunda çalışan otonom bir CFO-Bot (Finansal Kontrolör Ajanı) yapay zekasısın.");
             systemPrompt.AppendLine("Kullanıcı sana finansal sorular soracak veya veritabanında işlem yapmanı isteyecek.");
-            systemPrompt.AppendLine("Eğer kullanıcı bir faturanın vadesini uzatmak, durumunu güncellemek, taksit ödemek veya kasa bakiyesini değiştirmek isterse, sana verilen fonksiyonları (tools) kullanarak bu işlemi otonom olarak gerçekleştir.");
+            systemPrompt.AppendLine("Eğer kullanıcı bir faturanın vadesini uzatmak, durumunu güncellemek, taksit ödemek, kasa bakiyesini değiştirmek veya tahsilat başlatmak isterse, sana verilen fonksiyonları (tools) kullanarak bu işlemi otonom olarak gerçekleştir.");
+            systemPrompt.AppendLine("Kullanıcı sana 'What-If' veya 'Eğer şöyle olursa' tarzında senaryolar sorarsa, mevcut faturaları ve nakit durumunu analiz edip tahmini bir senaryo sonucu (nakit açığı/fazlası) oluştur ve stratejik bir CFO tavsiyesi ver.");
             systemPrompt.AppendLine("Yanıtlarını Türkçe ver ve profesyonel bir CFO gibi konuş.");
             systemPrompt.AppendLine($"\n--- MEVCUT FİNANSAL DURUM ---");
             systemPrompt.AppendLine($"Kasa Nakit Mevcudu: {hesap?.ToplamBakiye ?? 0} {hesap?.ParaBirimi ?? "TRY"}");
@@ -239,6 +240,20 @@ namespace FinGuard.API.Services
                                     properties = new
                                     {
                                         fatura_no = new { type = "string", description = "Taksiti ödenecek faturanın numarası" }
+                                    },
+                                    required = new[] { "fatura_no" }
+                                }
+                            },
+                            new
+                            {
+                                name = "tahsilat_baslat",
+                                description = "Gecikmiş veya vadesi yaklaşan bir fatura için otonom tahsilat sürecini başlatır. Tahsilat e-posta taslağı ve ödeme linki üretir.",
+                                parameters = new
+                                {
+                                    type = "object",
+                                    properties = new
+                                    {
+                                        fatura_no = new { type = "string", description = "Tahsilatı başlatılacak faturanın numarası" }
                                     },
                                     required = new[] { "fatura_no" }
                                 }
@@ -434,6 +449,36 @@ namespace FinGuard.API.Services
 
                     await context.SaveChangesAsync();
                     return $"Başarılı: '{faturaNo}' faturasının {fatura.OdenenTaksit}. taksiti ödendi ({fatura.OdenenTaksit}/{fatura.ToplamTaksit}). Taksit tutarı: {taksitTutari:N2} TL. Kalan taksit: {fatura.ToplamTaksit - fatura.OdenenTaksit}";
+                }
+                case "tahsilat_baslat":
+                {
+                    var faturaNo = args.GetProperty("fatura_no").GetString();
+
+                    var fatura = await context.Faturalar
+                        .FirstOrDefaultAsync(f => f.FaturaNo == faturaNo && f.UserId == userId);
+
+                    if (fatura == null)
+                        return $"Hata: '{faturaNo}' numaralı fatura bulunamadı.";
+
+                    if (fatura.Durum == "Ödendi")
+                        return $"Hata: '{faturaNo}' numaralı fatura zaten ödenmiş durumda, tahsilat başlatılamaz.";
+
+                    // Tahsilat için e-posta taslağı ve simüle edilmiş link oluştur
+                    var odemeLinki = $"https://pay.finguard.ai/checkout/inv-{Guid.NewGuid().ToString().Substring(0,8)}";
+                    
+                    return $@"Başarılı: '{faturaNo}' numaralı {fatura.CariAd} faturası için tahsilat süreci başlatıldı. 
+                    
+Aşağıdaki e-posta taslağı ve ödeme linki hazırlandı:
+
+**Kime:** muhasebe@{fatura.CariAd.ToLower().Replace(" ", "").Replace(".", "").Replace("ş","s").Replace("ı","i")}.com
+**Konu:** {faturaNo} Nolu Fatura Ödeme Hatırlatması
+**Mesaj:** 
+Sayın İlgili,
+Kayıtlarımıza göre {fatura.VadeTarihi:dd.MM.yyyy} vadeli, {fatura.Tutar:N2} TL tutarındaki faturanızın ödemesi henüz tarafımıza ulaşmamıştır. Ödemenizi aşağıdaki güvenli ödeme linki üzerinden kredi kartınızla hızlıca gerçekleştirebilirsiniz:
+
+Hızlı Ödeme Linki: {odemeLinki}
+
+FinGuard Otonom Tahsilat Sistemi";
                 }
                 default:
                     return $"Hata: Bilinmeyen fonksiyon: {functionName}";
