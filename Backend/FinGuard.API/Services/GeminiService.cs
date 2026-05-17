@@ -56,6 +56,14 @@ namespace FinGuard.API.Services
         // =====================================================================
         public async Task<string> AnalyzeRiskAsync(Hesap hesap, List<Fatura> faturalar, List<SatisVerisi> satislar)
         {
+            faturalar ??= new List<Fatura>();
+            satislar ??= new List<SatisVerisi>();
+
+            if (!faturalar.Any() && !satislar.Any())
+            {
+                return "{ \"RiskDurumu\": \"Guvende\", \"AcikTutar\": 0, \"Mesaj\": \"FinGuard.AI'a hoş geldiniz! Analizlerin başlayabilmesi için lütfen 'Faturalar' sekmesinden ilk faturanızı ekleyin veya 'Bot Ayarları'ndan geçmiş satış verilerinizi girin. CFO-Bot verilerinizi otonom olarak izlemek için beklemektedir.\", \"OnerilenAksiyon\": \"İlk faturanızı ekleyin veya satış verisi tanımlayın.\" }";
+            }
+
             var promptBuilder = new StringBuilder();
             promptBuilder.AppendLine("Sen KOBİ'ler için çalışan uzman bir Finansal Kontrolörsün (CFO-Bot).");
             promptBuilder.AppendLine($"Şu an şirketin kasasında {hesap.ToplamBakiye} {hesap.ParaBirimi} bulunuyor.");
@@ -65,6 +73,7 @@ namespace FinGuard.API.Services
 
             promptBuilder.AppendLine("Aşağıdaki geçmiş satış verilerini, gelecek borç/alacak faturalarını incele ve şirketin finansal sağlığını analiz et.");
             promptBuilder.AppendLine($"Eğer Net Likidite ({netLikidite} TL) eksiye düşüyorsa veya satışlarda dönemsel bir daralma varsa acil uyarı ver ve stratejik CFO tavsiyelerinde bulun (Kampanya, finansman vs).");
+            promptBuilder.AppendLine("KURAL: Eğer giden (borç) faturası hiç yoksa veya kasa bakiyesi + alacaklar (gelen faturalar) toplamı, borçların 3 katından fazla ise RiskDurumu kesinlikle 'Guvende' olmalıdır. Borç yokken veya kasa bakiyesi bu kadar yüksekken asla durumu 'Kritik' veya 'Orta' yapma, her şeyin mükemmel olduğunu belirt.");
             
             promptBuilder.AppendLine("Lütfen SADECE aşağıdaki JSON formatında yanıt ver, ekstra hiçbir açıklama ekleme:");
             promptBuilder.AppendLine("{ \"RiskDurumu\": \"Kritik/Orta/Dusuk/Guvende\", \"AcikTutar\": 0, \"Mesaj\": \"...\", \"OnerilenAksiyon\": \"...\" }");
@@ -105,7 +114,12 @@ namespace FinGuard.API.Services
 
             if (!response.IsSuccessStatusCode)
             {
-                return "{ \"RiskDurumu\": \"Hata (Kota Doldu)\", \"AcikTutar\": 0, \"Mesaj\": \"Yapay zeka analiz API limitiniz (Gemini API) dolmuş görünüyor. Uygulamayı kullanmaya devam edebilirsiniz ancak yapay zeka analizleri şu an çalışmıyor.\", \"OnerilenAksiyon\": \"API Anahtarınızı yenileyin\", \"HedefFaturaID\": 0 }";
+                var errBody = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[GEMINI RISK HATA] Status: {response.StatusCode} | Body: {errBody}");
+                
+                // Return a valid JSON with the actual error detail inside the "Mesaj" field
+                var safeErrBody = errBody.Replace("\"", "\\\"").Replace("\n", " ").Replace("\r", "").Trim();
+                return $"{{\"RiskDurumu\": \"Hata ({response.StatusCode})\", \"AcikTutar\": 0, \"Mesaj\": \"Gemini API Hatası: {safeErrBody}\", \"OnerilenAksiyon\": \"Lütfen appsettings.Development.json içerisindeki ApiKey anahtarınızı ve console loglarını kontrol edin.\", \"HedefFaturaID\": 0}}";
             }
 
             var responseString = await response.Content.ReadAsStringAsync();

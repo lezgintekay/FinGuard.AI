@@ -20,6 +20,17 @@ axios.interceptors.request.use((config) => {
   return config;
 });
 
+const getTabTitle = (tab) => {
+  switch (tab) {
+    case 'genel-bakis': return 'GENEL BAKIŞ';
+    case 'faturalar': return 'FATURALAR';
+    case 'nakit-akisi': return 'NAKİT AKIŞI & AI';
+    case 'cfo-bot': return 'CFO-BOT SOHBET';
+    case 'bot-ayarlari': return 'BOT AYARLARI';
+    default: return tab.toUpperCase();
+  }
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null); // { id, name, role }
@@ -51,7 +62,7 @@ function App() {
       setUser(JSON.parse(savedUser));
       setIsAuthenticated(true);
       setInitialLoading(true);
-      fetchData(kasaNakit);
+      fetchData();
     }
   }, []);
 
@@ -68,21 +79,27 @@ function App() {
   const [formAy, setFormAy] = useState(new Date().getMonth() + 1);
   const [formSatisTutar, setFormSatisTutar] = useState("");
 
-  const fetchData = async (currentBalance) => {
+  // Verileri API'den çekme
+  const fetchData = async (overrideKasa = null) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-      const hesapRes = await axios.get('/Hesap');
-      const guncelBakiye = currentBalance !== undefined ? currentBalance : hesapRes.data.toplamBakiye;
-      setKasaNakit(guncelBakiye);
+      const authHeader = { headers: { Authorization: `Bearer ${token}` } };
+      
+      const invoicesRes = await axios.get('/fatura', authHeader);
+      setInvoices(invoicesRes.data);
 
-      const riskRes = await axios.get(`/Analysis/risk?overrideKasa=${guncelBakiye}`);
-      setRiskData(riskRes.data);
-      setSimText(riskRes.data.mesaj); // Auto-fill simtext with AI message
-
-      const invoiceRes = await axios.get('/Fatura');
-      setInvoices(invoiceRes.data);
-
-      const salesRes = await axios.get('/Satis');
+      const salesRes = await axios.get('/satis', authHeader);
       setSalesData(salesRes.data);
+
+      const accountRes = await axios.get('/hesap', authHeader);
+      if (accountRes.data) {
+        setKasaNakit(overrideKasa !== null ? overrideKasa : accountRes.data.toplamBakiye);
+      }
+      
+      const riskRes = await axios.get(`/Analysis/risk?overrideKasa=${overrideKasa !== null ? overrideKasa : kasaNakit}`);
+      setRiskData(riskRes.data);
     } catch (err) {
       if (err.response && err.response.status === 401) {
         handleLogout();
@@ -107,7 +124,7 @@ function App() {
     ]);
     setChatInput('');
     setChatLoading(false);
-    await fetchData(kasaNakit);
+    await fetchData();
     toast.success(`Hoş geldin, ${data.user.name}!`);
   };
 
@@ -132,17 +149,7 @@ function App() {
     setChatLoading(false);
   };
 
-  const handleSimulation = (e) => {
-    e.preventDefault();
-    const match = simText.match(/\d+/g);
-    if (match && user) {
-      const eklenenPara = parseInt(match[0]);
-      const yeniNakit = kasaNakit + eklenenPara;
-      setKasaNakit(yeniNakit);
-      fetchData(yeniNakit);
-    }
-  };
-
+  // Fatura Ekleme
   const handleAddInvoice = async (e) => {
     e.preventDefault();
     if (!formFaturaNo || !formCariAd || !formTutar || !formVade) {
@@ -152,26 +159,36 @@ function App() {
 
     setAddingInvoice(true);
     const taksitSayisi = parseInt(formTaksit) || 1;
-    const newFatura = {
-      faturaNo: formFaturaNo,
-      cariAd: formCariAd,
-      tutar: parseFloat(formTutar),
-      kesimTarihi: new Date().toISOString(),
-      vadeTarihi: new Date(formVade).toISOString(),
-      faturaTipi: formTip,
-      durum: "Bekliyor",
-      taksitliMi: taksitSayisi > 1,
-      toplamTaksit: taksitSayisi,
-      odenenTaksit: 0
-    };
-
     try {
-      await axios.post('/Fatura', newFatura);
-      setFormFaturaNo(""); setFormCariAd(""); setFormTutar(""); setFormVade(""); setFormTip("Giden"); setFormTaksit(1);
-      toast.success("Yeni fatura eklendi!");
+      const token = localStorage.getItem('token');
+      const authHeader = { headers: { Authorization: `Bearer ${token}` } };
+      
+      const payload = {
+        faturaNo: formFaturaNo,
+        cariAd: formCariAd,
+        tutar: parseFloat(formTutar),
+        vadeTarihi: new Date(formVade).toISOString(),
+        faturaTipi: formTip,
+        durum: "Bekliyor",
+        taksitliMi: taksitSayisi > 1,
+        toplamTaksit: taksitSayisi,
+        odenenTaksit: 0
+      };
+
+      await axios.post('/fatura', payload, authHeader);
+      toast.success("Fatura başarıyla eklendi.");
+      
+      // Formu temizle
+      setFormFaturaNo("");
+      setFormCariAd("");
+      setFormTutar("");
+      setFormVade("");
+      setFormTip("Giden");
+      setFormTaksit(1);
+
       await fetchData();
     } catch (err) {
-      toast.error("Fatura eklenemedi.");
+      toast.error("Fatura eklenirken bir hata oluştu.");
     } finally {
       setAddingInvoice(false);
     }
@@ -179,17 +196,26 @@ function App() {
 
   const handleDeleteInvoice = async (id) => {
     try {
-      await axios.delete(`/Fatura/${id}`);
+      const token = localStorage.getItem('token');
+      const authHeader = { headers: { Authorization: `Bearer ${token}` } };
+      await axios.delete(`/fatura/${id}`, authHeader);
       toast.success("Fatura başarıyla silindi.");
       await fetchData();
     } catch (err) {
-      toast.error("Fatura silinemedi.");
+      toast.error("Fatura silinirken bir hata oluştu.");
     }
   };
 
   const handleUpdateStatus = async (id, newStatus) => {
     try {
-      await axios.put(`/Fatura/${id}/durum`, `"${newStatus}"`, { headers: { 'Content-Type': 'application/json' } });
+      const token = localStorage.getItem('token');
+      const authHeader = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      };
+      await axios.put(`/fatura/${id}/durum`, `"${newStatus}"`, authHeader);
       toast.success(`Fatura durumu "${newStatus}" olarak güncellendi.`);
       await fetchData();
     } catch (err) {
@@ -200,7 +226,14 @@ function App() {
   const handleUpdateKasa = async (e) => {
     e.preventDefault();
     try {
-      await axios.put('/Hesap', kasaNakit, { headers: { 'Content-Type': 'application/json' } });
+      const token = localStorage.getItem('token');
+      const authHeader = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      };
+      await axios.put('/hesap', kasaNakit, authHeader);
       toast.success("Kasa mevcudu güncellendi!");
       await fetchData();
     } catch (err) {
@@ -215,7 +248,9 @@ function App() {
       return;
     }
     try {
-      await axios.post('/Satis', { yil: formYil, ay: formAy, toplamSatis: parseFloat(formSatisTutar) });
+      const token = localStorage.getItem('token');
+      const authHeader = { headers: { Authorization: `Bearer ${token}` } };
+      await axios.post('/satis', { yil: formYil, ay: formAy, toplamSatis: parseFloat(formSatisTutar) }, authHeader);
       toast.success("Satış verisi eklendi!");
       setFormSatisTutar("");
       await fetchData();
@@ -226,7 +261,9 @@ function App() {
 
   const handleDeleteSales = async (id) => {
     try {
-      await axios.delete(`/Satis/${id}`);
+      const token = localStorage.getItem('token');
+      const authHeader = { headers: { Authorization: `Bearer ${token}` } };
+      await axios.delete(`/satis/${id}`, authHeader);
       toast.success("Satış verisi silindi.");
       await fetchData();
     } catch (err) {
@@ -234,18 +271,54 @@ function App() {
     }
   };
 
-  // CFO-Bot Sohbet fonksiyonu
-  const sendChatMessage = async (e) => {
+  const handleSimulation = (e) => {
     e.preventDefault();
-    if (!chatInput.trim() || chatLoading) return;
+    if (!simText.trim()) {
+      toast.error("Lütfen simüle etmek istediğiniz tutarı içeren bir senaryo yazın.");
+      return;
+    }
+    const match = simText.match(/\d+/g);
+    if (match) {
+      const eklenenPara = parseInt(match[0]);
+      const yeniNakit = kasaNakit + eklenenPara;
+      setKasaNakit(yeniNakit);
+      fetchData(yeniNakit);
+      toast.success(`Nakit akışı senaryosu simüle edildi! Kasa bakiyesi +₺${eklenenPara.toLocaleString('tr-TR')} artırıldı.`);
+    } else {
+      toast.error("Senaryoda simüle edilecek sayısal bir tutar bulunamadı (Örn: 200000 TL).");
+    }
+  };
 
-    const userMessage = chatInput.trim();
-    setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+  // AI Senaryo Simülasyonu
+  const runAiSimulation = async () => {
+    if (loading) return;
+    setLoading(true);
+    setSimText("");
+
+    try {
+      const token = localStorage.getItem('token');
+      const authHeader = { headers: { Authorization: `Bearer ${token}` } };
+      
+      const res = await axios.post('/Chat/simulate', {}, authHeader);
+      setSimText(res.data.analysis);
+      toast.success("AI Simülasyonu tamamlandı.");
+    } catch (err) {
+      toast.error("Simülasyon çalıştırılırken bir hata oluştu.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // CFO-Bot Sohbet fonksiyonu
+  const handleSendMessage = async (text) => {
+    if (!text.trim() || chatLoading) return;
+
+    setChatMessages(prev => [...prev, { role: 'user', text }]);
     setChatInput('');
     setChatLoading(true);
 
     try {
-      const res = await axios.post('/Chat/message', { message: userMessage });
+      const res = await axios.post('/Chat/message', { message: text });
       setChatMessages(prev => [...prev, { role: 'bot', text: res.data.response }]);
       // Fatura veya kasa değişikliği yapılmış olabilir, verileri tazele
       await fetchData();
@@ -255,6 +328,11 @@ function App() {
       setChatLoading(false);
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     }
+  };
+
+  const sendChatMessage = (e) => {
+    e.preventDefault();
+    handleSendMessage(chatInput);
   };
 
   // Sesle Komut (Voice-to-Action) Entegrasyonu
@@ -267,13 +345,12 @@ function App() {
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'tr-TR';
-    recognition.interimResults = true; // Konuşurken ekranda anlık (canlı) görünsün
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
-    let existingInput = chatInput; // Mevcut yazılanları kaybetmemek için
+    let existingInput = chatInput;
 
     recognition.onstart = () => {
-      console.log("[Mic] Dinleme başladı...");
       setIsListening(true);
     };
 
@@ -282,22 +359,15 @@ function App() {
         .map(result => result[0].transcript)
         .join('');
       
-      console.log("[Mic] Algılanan metin:", transcript);
       setChatInput(existingInput ? `${existingInput} ${transcript}` : transcript);
     };
 
     recognition.onerror = (event) => {
-      console.error("[Mic] Hata oluştu:", event.error);
       setIsListening(false);
-      if (event.error === 'not-allowed') {
-        toast.error("Mikrofon izni verilmedi.");
-      } else {
-        toast.error(`Mikrofon hatası: ${event.error}`);
-      }
+      toast.error(`Mikrofon hatası: ${event.error}`);
     };
 
     recognition.onend = () => {
-      console.log("[Mic] Dinleme bitti.");
       setIsListening(false);
     };
 
@@ -326,12 +396,13 @@ function App() {
   return (
     <>
       <Toaster position="top-right" />
+
       <div className="dashboard-wrapper">
         {/* Sol Menü */}
         <aside className="sidebar">
           <div className="sidebar-brand">
             <h1>FIN GUARD AI</h1>
-            <p>Institutional Grade CFO-Bot</p>
+            <p>KURUMSAL CFO-BOT AJANI</p>
           </div>
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <a onClick={() => setActiveTab('genel-bakis')} className={`nav-link ${activeTab === 'genel-bakis' ? 'active' : ''}`}>
@@ -371,7 +442,7 @@ function App() {
         {/* Ana İçerik */}
         <main className="main-content">
           <header className="top-header">
-            <div className="page-title">{activeTab.replace('-', ' ')} Paneli</div>
+            <div className="page-title">{getTabTitle(activeTab)} PANELİ</div>
             <div className="ai-status">
               <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>bolt</span>
               <span>Gemini 2.5 Flash Aktif</span>

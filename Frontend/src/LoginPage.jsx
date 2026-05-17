@@ -27,17 +27,7 @@ function LoginPage({ onLogin, onSwitchToRegister }) {
     }
   };
 
-  const loginAsTestUser = async (testEmail, testPassword) => {
-    setLoading(true);
-    try {
-      const res = await axios.post('/auth/login', { email: testEmail, password: testPassword });
-      onLogin(res.data);
-    } catch (err) {
-      toast.error('Test kullanıcısı girişi başarısız oldu.');
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
@@ -110,24 +100,7 @@ function LoginPage({ onLogin, onSwitchToRegister }) {
           </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', margin: '24px 0', color: 'var(--text-muted)', fontSize: '12px' }}>
-          <div style={{ flex: 1, height: '1px', background: 'var(--card-border)' }}></div>
-          <span style={{ padding: '0 12px' }}>veya test kullanıcıları</span>
-          <div style={{ flex: 1, height: '1px', background: 'var(--card-border)' }}></div>
-        </div>
 
-        <button className="auth-button" onClick={() => loginAsTestUser("lezgin@test.com", "123456")}>
-          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>admin_panel_settings</span>
-          Admin (Lezgin Tekay)
-        </button>
-        <button className="auth-button" onClick={() => loginAsTestUser("ahmet@test.com", "123456")}>
-          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>warning</span>
-          Senaryo A (Kritik Risk)
-        </button>
-        <button className="auth-button" onClick={() => loginAsTestUser("ayse@test.com", "123456")}>
-          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
-          Senaryo B (Güvenli)
-        </button>
       </div>
     </div>
   );
