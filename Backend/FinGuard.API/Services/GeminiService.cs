@@ -25,6 +25,33 @@ namespace FinGuard.API.Services
         }
 
         // =====================================================================
+        // YARDIMCI: Rate Limit (429) hatasında otomatik yeniden deneme
+        // =====================================================================
+        private async Task<HttpResponseMessage> SendWithRetryAsync(string url, StringContent content, int maxRetries = 3)
+        {
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                var response = await _httpClient.PostAsync(url, content);
+
+                if ((int)response.StatusCode == 429 && attempt < maxRetries)
+                {
+                    // Rate limit aşıldı — üstel bekleme ile yeniden dene
+                    var waitSeconds = (int)Math.Pow(2, attempt); // 2s, 4s, 8s
+                    await Task.Delay(waitSeconds * 1000);
+                    // Content nesnesini yeniden oluştur (çünkü HttpContent sadece 1 kez gönderilebilir)
+                    var body = await content.ReadAsStringAsync();
+                    content = new StringContent(body, Encoding.UTF8, "application/json");
+                    continue;
+                }
+
+                return response;
+            }
+
+            // Bu noktaya ulaşılmamalı ama güvenlik için
+            return await _httpClient.PostAsync(url, content);
+        }
+
+        // =====================================================================
         // 1) RİSK ANALİZİ (mevcut, değişiklik yok)
         // =====================================================================
         public async Task<string> AnalyzeRiskAsync(Hesap hesap, List<Fatura> faturalar, List<SatisVerisi> satislar)
@@ -72,9 +99,9 @@ namespace FinGuard.API.Services
 
             var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
             var cleanApiKey = _apiKey.Trim();
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={cleanApiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={cleanApiKey}";
 
-            var response = await _httpClient.PostAsync(url, jsonContent);
+            var response = await SendWithRetryAsync(url, jsonContent);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -222,15 +249,16 @@ namespace FinGuard.API.Services
             };
 
             var cleanApiKey = _apiKey.Trim();
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={cleanApiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={cleanApiKey}";
             var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(url, jsonContent);
+            var response = await SendWithRetryAsync(url, jsonContent);
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
-                return $"⚠️ Gemini API hatası: {response.StatusCode}. Lütfen API anahtarınızı ve kotanızı kontrol edin.";
+                Console.WriteLine($"[GEMINI HATA] Status: {response.StatusCode} | Body: {errorBody}");
+                return $"⚠️ Gemini API hatası ({response.StatusCode}): {errorBody}";
             }
 
             var responseString = await response.Content.ReadAsStringAsync();

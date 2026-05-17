@@ -326,7 +326,7 @@ function App() {
           <div className="page-title">{activeTab.replace('-', ' ')} Paneli</div>
           <div className="ai-status">
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>bolt</span>
-            <span>Gemini 2.0 Flash Aktif</span>
+            <span>Gemini 2.5 Flash Aktif</span>
           </div>
         </header>
 
@@ -601,7 +601,7 @@ function App() {
                 <div style={{ fontWeight: 800, color: '#fff', fontSize: '15px' }}>FinGuard CFO-Bot</div>
                 <div style={{ fontSize: '11px', color: 'var(--accent-success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-success)', display: 'inline-block' }}></span>
-                  Otonom Ajan Aktif • Gemini 2.0 Flash
+                  Otonom Ajan Aktif • Gemini 2.5 Flash
                 </div>
               </div>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
