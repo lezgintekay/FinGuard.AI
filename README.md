@@ -161,13 +161,4 @@ Jürinin uygulamayı farklı finansal risk senaryolarıyla anında test edebilme
 
 ---
 
-## 👨‍💻 Geliştirici
 
-**Lezgin Tekay**  
-BTK Akademi Hackathon 2026
-
----
-
-## 📄 Lisans
-
-Bu proje BTK Akademi Hackathon 2026 kapsamında geliştirilmiştir.
